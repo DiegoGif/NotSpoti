@@ -23,7 +23,6 @@ def get_openai_response(message, openai_api_key):
     )
     return response['choices'][0]['message']['content']
 
-
 # Spotify Functions
 def spotify_authenticate(client_id, client_secret, redirect_uri, scope):
     auth_manager = SpotifyOAuth(
@@ -47,7 +46,10 @@ def create_playlist(sp, user_id, playlist_name, public=True, collaborative=False
 
 # Telegram Bot Handlers
 def start(update: Update, context: CallbackContext):
-    update.message.reply_text("Welcome to the GPT-Spotify Bot!")
+    auth_manager = SpotifyOAuth(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI,
+                                scope=SPOTIFY_SCOPE)
+    auth_url = auth_manager.get_authorize_url()
+    update.message.reply_text(f"Please authenticate with Spotify here: {auth_url}")
 
 def handle_message(update: Update, context: CallbackContext):
     user_message = update.message.text
@@ -55,11 +57,14 @@ def handle_message(update: Update, context: CallbackContext):
     if user_message.startswith('playlist'):
         command, *params = user_message.split()
         if command == 'playlist_create':
-            playlist_name = ' '.join(params)
-            sp = spotify_authenticate(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, SPOTIFY_SCOPE)
-            user_id = sp.current_user()['id']
-            playlist_id = create_playlist(sp, user_id, playlist_name)
-            update.message.reply_text(f"Playlist '{playlist_name}' created with ID: {playlist_id}")
+            if 'spotify_token' in context.user_data:
+                sp = spotipy.Spotify(auth=context.user_data['spotify_token'])
+                user_id = sp.current_user()['id']
+                playlist_name = ' '.join(params)
+                playlist_id = create_playlist(sp, user_id, playlist_name)
+                update.message.reply_text(f"Playlist '{playlist_name}' created with ID: {playlist_id}")
+            else:
+                update.message.reply_text("You must authenticate with Spotify first. Send '/start' to get the authentication link.")
     else:
         openai_response = get_openai_response(user_message, OPENAI_API_KEY)
         update.message.reply_text(openai_response)
