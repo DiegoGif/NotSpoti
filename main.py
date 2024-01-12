@@ -17,12 +17,12 @@ TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 # OpenAI Function
 def get_openai_response(message, openai_api_key):
     openai.api_key = openai_api_key
-    response = openai.Completion.create(
-        engine="text-davinci-004",
-        prompt=message,
-        max_tokens=150
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": message}]
     )
-    return response.choices[0].text.strip()
+    return response['choices'][0]['message']['content']
+
 
 # Spotify Functions
 def spotify_authenticate(client_id, client_secret, redirect_uri, scope):
