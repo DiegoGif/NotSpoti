@@ -33,7 +33,7 @@ def spotify_authenticate():
         redirect_uri=SPOTIFY_REDIRECT_URI,
         scope=SPOTIFY_SCOPE
     )
-    return spotipy.Spotify(auth_manager=auth_manager)
+    return auth_manager  # Return the auth_manager instead of the Spotify client
 
 # Function to create a Spotify playlist
 def create_playlist(sp, user_id, playlist_name):
@@ -48,8 +48,9 @@ def create_playlist(sp, user_id, playlist_name):
 
 # Start command handler
 def start(update: Update, context: CallbackContext):
-    auth_url = spotify_authenticate().get_authorize_url()
-    update.message.reply_text(f"Please authenticate with Spotify here: {auth_url}")
+    auth_manager = spotify_authenticate()
+    auth_url = auth_manager.get_authorize_url()
+    update.message.reply_text(f"Please authenticate with Spotify here:{auth_url}")
 
 # Message handler
 def handle_message(update: Update, context: CallbackContext):
