@@ -4,6 +4,11 @@ from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
+from flask import Flask, request, redirect, session
+
+# Flask app setup
+app = Flask(__name__)
+app.secret_key = os.urandom(24)  # Replace with a strong, random key for session management
 
 # Environment variables
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
@@ -18,9 +23,7 @@ def get_openai_response(message):
     openai.api_key = OPENAI_API_KEY
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "You are NotPlaylist, an AI chatbot adept in creating Spotify music playlists."},
-            {"role": "user", "content": message}
+        messages=[{"role": "system", "content": "You are NotPlaylist, an AI chatbot adept in creating Spotify music playlists."},{"role": "user", "content": message}
         ]
     )
     return response.choices[0].message.content
@@ -46,6 +49,21 @@ def create_playlist(sp, user_id, playlist_name):
     )
     return playlist['id']
 
+# Flask route for the Spotify OAuth callback
+@app.route('/spotify_callback')
+def spotify_callback():
+    auth_manager = spotify_authenticate()
+    code = request.args.get('code')
+    token_info = auth_manager.get_access_token(code)
+    session['spotify_token'] = token_info['access_token']  # Save the token in the session
+    # Redirect to a page that indicates successful authentication or back to your bot
+    return redirect('https://t.me/TgAzTranslatorTest_bot')  # Replace with your actual redirect URL
+
+# Flask route for the index page, can be used for health checks
+@app.route('/')
+def index():
+    return 'The Flask server is running!'
+
 # Start command handler
 def start(update: Update, context: CallbackContext):
     auth_manager = spotify_authenticate()
@@ -65,7 +83,7 @@ def handle_message(update: Update, context: CallbackContext):
                 playlist_id = create_playlist(sp, user_id, playlist_name)
                 openai_response = get_openai_response(user_message)
                 # Additional logic to parse song list and add songs to playlist goes here
-                update.message.reply_text(f"Playlist '{playlist_name}' created with ID: {playlist_id}")
+                update.message.reply_text(f"Playlist '{playlist_name}' created with ID:{playlist_id}")
             else:
                 update.message.reply_text("You must authenticate with Spotify first. Send '/start' to get the authentication link.")
     else:
@@ -76,5 +94,18 @@ def handle_message(update: Update, context: CallbackContext):
 updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
 updater.dispatcher.add_handler(CommandHandler('start', start))
 updater.dispatcher.add_handler(MessageHandler(Filters.text, handle_message))
+
+# Run the Flask app in a separate thread
+from threading import Thread
+def run_flask():
+    app.run(port=5000)
+
+flask_thread = Thread(target=run_flask)
+flask_thread.start()
+
+# Start the Telegram bot polling
 updater.start_polling()
 updater.idle()
+
+# Ensure the Flask thread is also stopped when the bot is stopped
+flask_thread.join()
