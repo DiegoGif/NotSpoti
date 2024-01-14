@@ -8,7 +8,7 @@ from flask import Flask, request, redirect, session
 
 # Flask app setup
 app = Flask(__name__)
-app.secret_key = os.urandom(24)  # Replace with a strong, random key for session management
+app.secret_key = os.getenv('FLASK_SECRET_KEY')
 
 # Environment variables
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
@@ -98,7 +98,9 @@ updater.dispatcher.add_handler(MessageHandler(Filters.text, handle_message))
 # Run the Flask app in a separate thread
 from threading import Thread
 def run_flask():
-    app.run(port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
+
 
 flask_thread = Thread(target=run_flask)
 flask_thread.start()
