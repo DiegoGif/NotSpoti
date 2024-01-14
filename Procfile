@@ -1,1 +1,1 @@
-web: gunicorn "main:app" -b :$PORT -t 360
+web: gunicorn "main:app" -b :$PORT -w 2 -t 120
