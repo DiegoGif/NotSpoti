@@ -95,19 +95,8 @@ updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
 updater.dispatcher.add_handler(CommandHandler('start', start))
 updater.dispatcher.add_handler(MessageHandler(Filters.text, handle_message))
 
-# Run the Flask app in a separate thread
-from threading import Thread
-def run_flask():
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
-
-
-flask_thread = Thread(target=run_flask)
-flask_thread.start()
 
 # Start the Telegram bot polling
 updater.start_polling()
 updater.idle()
 
-# Ensure the Flask thread is also stopped when the bot is stopped
-flask_thread.join()
