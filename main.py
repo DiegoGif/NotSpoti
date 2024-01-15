@@ -100,7 +100,9 @@ def start(update: Update, context: CallbackContext):
     update.message.reply_text(f"Please authenticate with Spotify here: {auth_url}")
 
 # Message handler
-def handle_message(update: Update, context: CallbackContext):
+
+
+def updated_handle_message(update, context):
     user_message = update.message.text
     if user_message.startswith('playlist'):
         command, *params = user_message.split()
@@ -110,31 +112,22 @@ def handle_message(update: Update, context: CallbackContext):
                 user_id = sp.current_user()['id']
                 playlist_name = ' '.join(params)
                 playlist_id = create_playlist(sp, user_id, playlist_name)
-                openai_response = get_openai_response(user_message)
-                # Additional logic to parse song list and add songs to playlist goes here
-                update.message.reply_text(f"Playlist '{playlist_name}' created with ID:{playlist_id}")
+                response = openai.ChatCompletion.create(
+                    model='gpt-3.5-turbo',
+                    messages=[
+                        {'role':'system', 'content': 'You are a helpful assistant.'},
+                        {'role':'user', 'content': user_message}
+                    ]
+                )
+                update.message.reply_text(f"Playlist '{playlist_name}' created with ID: {playlist_id}. OpenAI says: {response['choices'][0]['message']['content']}.")
             else:
-                update.message.reply_text("You must authenticate with Spotify first. Send '/start' to get the authentication link.")
+                update.message.reply_text('You must authenticate with Spotify first. Send /start to get the authentication link.')
     else:
-        openai_response = get_openai_response(user_message)
-        update.message.reply_text(openai_response)
-
-# Initialize and run the bot
-updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
-updater.dispatcher.add_handler(CommandHandler('start', start))
-updater.dispatcher.add_handler(MessageHandler(Filters.text, handle_message))
-
-# Start the Telegram bot polling
-updater.start_polling()
-updater.idle()
-
-        # Handling OpenAI API response with timeout
         response = openai.ChatCompletion.create(
-        # Optimized playlist creation handling
-        if command == 'playlist_create':
-            # Check if Spotify token is available
-            if not context.user_data.get('spotify_token'):
-                update.message.reply_text('You must authenticate with Spotify first. Send '/start' to get the authentication link.')
-                return
-        # Optimized Spotify client initialization
-        sp = spotipy.Spotify(auth=context.user_data.get('spotify_token'), requests_timeout=10)
+            model='gpt-3.5-turbo',
+            messages=[
+                {'role': 'system', 'content': 'You are a helpful assistant.'},
+                {'role': 'user', 'content': user_message}
+            ]
+        )
+        update.message.reply_text(response['choices'][0]['message']['content'])
