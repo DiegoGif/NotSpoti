@@ -29,12 +29,12 @@ def get_openai_response(message):
     try:
         openai.api_key = OPENAI_API_KEY
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are NotPlaylist, an AI chatbot adept in creating Spotify music playlists."},
-                {"role": "user", "content": message}
-            ],
-            timeout=10
+        model="gpt-3.5-turbo",
+        messages=[
+        {"role": "system", "content": "You are NotPlaylist, an AI chatbot adept in creating Spotify music playlists."},
+        {"role": "user", "content": message}
+        ],
+        timeout=10
         )
         return response.choices[0].message.content
     except Exception as e:
