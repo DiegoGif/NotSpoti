@@ -1,6 +1,6 @@
 import os
 import logging
-# from telegram import Update
+# from telegram import Updat
 # from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 # import spotipy
 # from spotipy.oauth2 import SpotifyOAuth
