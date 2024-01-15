@@ -29,12 +29,12 @@ def get_openai_response(message):
     try:
         openai.api_key = OPENAI_API_KEY
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are NotPlaylist, an AI chatbot adept in creating Spotify music playlists."},
-                {"role": "user", "content": message}
-            ],
-            timeout=10
+        model="gpt-3.5-turbo",
+        messages=[
+        {"role": "system", "content": "You are NotPlaylist, an AI chatbot adept in creating Spotify music playlists."},
+        {"role": "user", "content": message}
+        ],
+        timeout=10
         )
         return response.choices[0].message.content
     except Exception as e:
@@ -66,36 +66,22 @@ def create_playlist(sp, user_id, playlist_name):
             description=''
         )
         return playlist['id']
-    except spotipy.SpotifyException as e:
-        logger.error(f"Spotify API error: {e}")
-        return None
+        logger.exception('Playlist creation failed')
     except Exception as e:
-        logger.error(f"General error creating playlist: {e}")
+        logger.error(f"Error creating Spotify playlist: {e}")
         return None
 
 # Flask route for the Spotify OAuth callback
 @app.route('/spotify_callback')
 def spotify_callback():
     logger.info("Received Spotify callback")
+    auth_manager = spotify_authenticate()
+    if not auth_manager:
+        return "Error in Spotify authentication."
     code = request.args.get('code')
-    if not code:
-        logger.error("No code parameter provided in callback")
-        return "Error: No authorization code provided."
-
-    try:
-        auth_manager = spotify_authenticate()
-        if not auth_manager:
-            return "Error in Spotify authentication."
-
-        token_info = auth_manager.get_access_token(code)
-        session['spotify_token'] = token_info['access_token']
-        return redirect('https://t.me/TgAzTranslatorTest_bot')
-    except spotipy.SpotifyException as e:
-        logger.error(f"Spotify API error: {e}")
-        return "Error in Spotify API interaction."
-    except Exception as e:
-        logger.error(f"General error in callback: {e}")
-        return "An error occurred during the callback process."
+    token_info = auth_manager.get_access_token(code)
+    session['spotify_token'] = token_info['access_token']
+    return redirect('https://t.me/TgAzTranslatorTest_bot')
 
 # Flask route for the index page, can be used for health checks
 @app.route('/')
@@ -119,20 +105,51 @@ def handle_message(update: Update, context: CallbackContext):
     if user_message.startswith('playlist'):
         command, *params = user_message.split()
         if command == 'playlist_create':
-            if 'spotify_token' in session:  # Use session for Spotify token storage
-                sp = spotipy.Spotify(auth=session['spotify_token'])
+            if 'spotify_token' in context.user_data:
+                sp = spotipy.Spotify(auth=context.user_data['spotify_token'])
                 user_id = sp.current_user()['id']
                 playlist_name = ' '.join(params)
                 playlist_id = create_playlist(sp, user_id, playlist_name)
+                openai_response = get_openai_response(user_message)
                 # Additional logic to parse song list and add songs to playlist goes here
-                update.message.reply_text(f"Playlist '{playlist_name}' created with ID: {playlist_id}")
+                update.message.reply_text(f"Playlist '{playlist_name}' created with ID:{playlist_id}")
             else:
                 update.message.reply_text("You must authenticate with Spotify first. Send '/start' to get the authentication link.")
     else:
         openai_response = get_openai_response(user_message)
         update.message.reply_text(openai_response)
 
-# Initialize and run the bot
+
+
+def updated_handle_message(update, context):
+    user_message = update.message.text
+    if user_message.startswith('playlist'):
+        command, *params = user_message.split()
+        if command == 'playlist_create':
+            if 'spotify_token' in context.user_data:
+                sp = spotipy.Spotify(auth=context.user_data['spotify_token'])
+                user_id = sp.current_user()['id']
+                playlist_name = ' '.join(params)
+                playlist_id = create_playlist(sp, user_id, playlist_name)
+                response = openai.ChatCompletion.create(
+                    model='gpt-3.5-turbo',
+                    messages=[
+                        {'role':'system', 'content': 'You are a helpful assistant.'},
+                        {'role':'user', 'content': user_message}
+                    ]
+                )
+                update.message.reply_text(f"Playlist '{playlist_name}' created with ID: {playlist_id}. OpenAI says: {response['choices'][0]['message']['content']}.")
+            else:
+                update.message.reply_text('You must authenticate with Spotify first. Send /start to get the authentication link.')
+    else:
+        response = openai.ChatCompletion.create(
+            model='gpt-3.5-turbo',
+            messages=[
+                {'role': 'system', 'content': 'You are a helpful assistant.'},
+                {'role': 'user', 'content': user_message}
+            ]
+        )
+        update.message.reply_text(response['choices'][0]['message']['content'])# Initialize and run the bot
 updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
 updater.dispatcher.add_handler(CommandHandler('start', start))
 updater.dispatcher.add_handler(MessageHandler(Filters.text, handle_message))
@@ -140,3 +157,14 @@ updater.dispatcher.add_handler(MessageHandler(Filters.text, handle_message))
 # Start the Telegram bot polling
 updater.start_polling()
 updater.idle()
+
+        # Handling OpenAI API response with timeout
+        response = openai.ChatCompletion.create(
+        # Optimized playlist creation handling
+        if command == 'playlist_create':
+            # Check if Spotify token is available
+            if not context.user_data.get('spotify_token'):
+                update.message.reply_text('You must authenticate with Spotify first. Send '/start' to get the authentication link.')
+                return
+        # Optimized Spotify client initialization
+        sp = spotipy.Spotify(auth=context.user_data.get('spotify_token'), requests_timeout=10)
