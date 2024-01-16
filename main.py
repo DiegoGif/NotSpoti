@@ -25,7 +25,7 @@ TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
 # Initialize the bot and dispatcher
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
-dispatcher = Dispatcher(bot, None, workers=0, use_context=True)
+dispatcher = Dispatcher(bot, None, workers=4, use_context=True)
 
 # Function to get response from OpenAI
 def get_openai_response(message):
