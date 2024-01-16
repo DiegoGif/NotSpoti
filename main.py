@@ -117,11 +117,15 @@ def handle_message(update: Update, context: CallbackContext):
         openai_response = get_openai_response(user_message)
         update.message.reply_text(openai_response)
 
-# Initialize and run the bot
-updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
-updater.dispatcher.add_handler(CommandHandler('start', start))
-updater.dispatcher.add_handler(MessageHandler(Filters.text, handle_message))
+# Function to start the Telegram bot
+def start_telegram_bot():
+    updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
+    updater.dispatcher.add_handler(CommandHandler('start', start))
+    updater.dispatcher.add_handler(MessageHandler(Filters.text, handle_message))
+    updater.start_polling()
+    updater.idle()
 
-# Start the Telegram bot polling
-updater.start_polling()
-updater.idle()
+# Start the Telegram bot only in the main process
+if __name__ == "__main__":
+    start_telegram_bot()
+
