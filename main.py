@@ -5,7 +5,6 @@ from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-from threading import Thread
 from flask import Flask, request, redirect, session
 
 # Set up logging
@@ -126,12 +125,7 @@ def start_telegram_bot():
     updater.start_polling()
     updater.idle()
 
-# Function to start the Telegram bot in a new thread
-def start_telegram_bot_in_thread():
-    thread = Thread(target=start_telegram_bot)
-    thread.start()
-
-# Call this function to start the bot in a separate thread
-start_telegram_bot_in_thread()
-
-
+# Start the Telegram bot only in the main process
+if __name__ == "__main__":
+    port = int(os.environ.get('PORT', 5000))  # Set the port for Railway compatibility
+    app.run(host='0.0.0.0', port=port)  # Bind to 0.0.0.0 to make the server accessible externally
