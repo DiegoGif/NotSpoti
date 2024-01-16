@@ -3,3 +3,4 @@ openai==0.28.0
 spotipy
 Flask
 gunicorn
+gevent
