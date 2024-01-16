@@ -1,11 +1,11 @@
 import os
 import openai
 import logging
-from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram import Update, Bot
+from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters, CallbackContext
+from flask import Flask, request, redirect, session
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-from flask import Flask, request, redirect, session
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -23,21 +23,23 @@ SPOTIFY_REDIRECT_URI = os.getenv('SPOTIFY_REDIRECT_URI')
 SPOTIFY_SCOPE = 'playlist-modify-public playlist-modify-private'
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
+# Initialize the bot and dispatcher
+bot = Bot(token=TELEGRAM_BOT_TOKEN)
+dispatcher = Dispatcher(bot, None, workers=0, use_context=True)
+
 # Function to get response from OpenAI
 def get_openai_response(message):
     try:
         openai.api_key = OPENAI_API_KEY
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are NotPlaylist, an AI chatbot adept in creating Spotify music playlists."},
-                {"role": "user", "content": message}
+            messages=[{"role": "system", "content": "You are an AI chatbot adept in creating Spotify music playlists."},{"role": "user", "content": message}
             ],
             timeout=10
         )
         return response.choices[0].message.content
     except Exception as e:
-        logger.error(f"Error during OpenAI API call: {e}")
+        logger.error(f"Error during OpenAI API call:{e}")
         return "An error occurred with OpenAI."
 
 # Function to authenticate with Spotify
@@ -51,7 +53,7 @@ def spotify_authenticate():
         )
         return auth_manager
     except Exception as e:
-        logger.error(f"Error during Spotify authentication: {e}")
+        logger.error(f"Error during Spotify authentication:{e}")
         return None
 
 # Function to create a Spotify playlist
@@ -66,7 +68,7 @@ def create_playlist(sp, user_id, playlist_name):
         )
         return playlist['id']
     except Exception as e:
-        logger.error(f"Error creating Spotify playlist: {e}")
+        logger.error(f"Error creating Spotify playlist:{e}")
         return None
 
 # Flask route for the Spotify OAuth callback
@@ -79,7 +81,8 @@ def spotify_callback():
     code = request.args.get('code')
     token_info = auth_manager.get_access_token(code)
     session['spotify_token'] = token_info['access_token']
-    return redirect('https://t.me/TgAzTranslatorTest_bot')
+    # Redirect to a Telegram bot conversation or a confirmation page
+    return redirect('https://t.me/your_telegram_bot')
 
 # Flask route for the index page, can be used for health checks
 @app.route('/')
@@ -95,7 +98,7 @@ def start(update: Update, context: CallbackContext):
         update.message.reply_text("Error in Spotify authentication.")
         return
     auth_url = auth_manager.get_authorize_url()
-    update.message.reply_text(f"Please authenticate with Spotify here: {auth_url}")
+    update.message.reply_text(f"Please authenticate with Spotify here:{auth_url}")
 
 # Message handler
 def handle_message(update: Update, context: CallbackContext):
@@ -103,29 +106,32 @@ def handle_message(update: Update, context: CallbackContext):
     if user_message.startswith('playlist'):
         command, *params = user_message.split()
         if command == 'playlist_create':
-            if 'spotify_token' in context.user_data:
-                sp = spotipy.Spotify(auth=context.user_data['spotify_token'])
+            if 'spotify_token' in session:
+                sp = spotipy.Spotify(auth=session['spotify_token'])
                 user_id = sp.current_user()['id']
                 playlist_name = ' '.join(params)
                 playlist_id = create_playlist(sp, user_id, playlist_name)
-                openai_response = get_openai_response(user_message)
                 # Additional logic to parse song list and add songs to playlist goes here
                 update.message.reply_text(f"Playlist '{playlist_name}' created with ID:{playlist_id}")
             else:
                 update.message.reply_text("You must authenticate with Spotify first. Send '/start' to get the authentication link.")
+        else:
+            update.message.reply_text("Invalid command. To create a playlist, use 'playlist_create <playlist_name>'.")
     else:
         openai_response = get_openai_response(user_message)
         update.message.reply_text(openai_response)
 
-# Function to start the Telegram bot
-def start_telegram_bot():
-    updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
-    updater.dispatcher.add_handler(CommandHandler('start', start))
-    updater.dispatcher.add_handler(MessageHandler(Filters.text, handle_message))
-    updater.start_polling()
-    updater.idle()
+# Flask route for the Telegram webhook
+@app.route('/telegram_webhook', methods=['POST'])
+def telegram_webhook():
+    update = Update.de_json(request.get_json(force=True), bot)
+    dispatcher.process_update(update)
+    return 'ok', 200
 
-# Start the Telegram bot only in the main process
-if __name__ == "__main__":
-    port = int(os.environ.get('PORT', 5000))  # Set the port for Railway compatibility
-    app.run(host='0.0.0.0', port=port)  # Bind to 0.0.0.0 to make the server accessible externally
+# Add handlers to dispatcher
+dispatcher.add_handler(CommandHandler('start', start))
+dispatcher.add_handler(MessageHandler(Filters.text, handle_message))
+
+if __name__ == '__main__':
+    # Start the Flask server
+    app.run(port=int(os.environ.get('PORT', 5000)))
